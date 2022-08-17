@@ -83,21 +83,28 @@ while True:
         request = str(request)
         led_on = request.find('/light/on')
         led_off = request.find('/light/off')
+        query_status = request.find('/light/status')
         print( 'led on = ' + str(led_on))
         print( 'led off = ' + str(led_off))
+        response = ""
 
         if led_on == 6:
             print("led on")
             led.value(1)
             stateis = "LED is ON"
+            response = html % stateis
 
         if led_off == 6:
             print("led off")
             led.value(0)
             stateis = "LED is OFF"
+            response = html % stateis
 
-        response = html % stateis
+        if query_status == 6:
+            print("status =", led.value())
+            response = str(led.value()) + '\r\n'
 
+        print ("response =", response)
         cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
         cl.send(response)
         cl.close()
