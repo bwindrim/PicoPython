@@ -11,16 +11,9 @@ ssids = {
     'BedroomTestNetwork': 'dvdrtsPnk4xq'
     }
 
-led = machine.Pin("LED", machine.Pin.OUT)
 # Configure the number of WS2812 LEDs, pins and brightness.
 NUM_NEOPIXELS = 3 # ItsyBitsy RP2040 only has one neopixel
-#PWR_PIN = 16      # GPIO16 is neopixel power on ItsyBitsy RP2040
-NEOPIXEL_PIN = 16 # GPIO17 is the neopixel control on ItsyBitsy RP2040, 16 on Pico breadboard
-LED_PIN = 25      # GPIO11 is the red LED on ItsyBitsy RP2040, GPIO25 for Pico
-
-#pwr = Pin(PWR_PIN, Pin.OUT)
-#led = machine.Pin(LED_PIN, Pin.OUT)
-#npx = Pin(NEOPIXEL_PIN, Pin.OUT)
+NEOPIXEL_PIN = 16 # GPIO16 on Pico breadboard
  
 def pixel_value(color, brightness):
         r = int(color[0] * brightness)
@@ -28,39 +21,33 @@ def pixel_value(color, brightness):
         b = int(color[2] * brightness)
         return (r, g, b)
     
-def pixels_fill(color, brightness):
+def pixels_fill(rgb, brightness):
+    r = int(rgb[0] * brightness)
+    g = int(rgb[1] * brightness)
+    b = int(rgb[2] * brightness)
     for i in range(len(np)):
-        np[i] = pixel_value(color, brightness)
+        np[i] = (g, r, b)
  
-def pixels_shift_append(color, brightness):
+def pixels_shift_append(rgb, brightness):
+    grb = (rgb[1], rgb[0], rgb[2])
     for i in range(len(np) - 1):
         np[i] = np[i + 1]
-    np[len(np) - 1] = pixel_value(color, brightness)
+    np[len(np) - 1] = grb
    
-    
-
+led = machine.Pin("LED", machine.Pin.OUT)
 pin = machine.Pin(NEOPIXEL_PIN, machine.Pin.OUT)   # set GPIO0 to output to drive NeoPixels
-np = NeoPixel(pin, 3)   # create NeoPixel driver on GPIO16 for 3 pixels
+np = NeoPixel(pin, NUM_NEOPIXELS)   # create NeoPixel driver
 
 BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-YELLOW = (255, 150, 0)
-GREEN = (0, 255, 0)
-CYAN = (0, 255, 255)
-BLUE = (0, 0, 255)
-PURPLE = (180, 0, 255)
 WHITE = (255, 255, 255)
-COLORS = (BLACK, RED, YELLOW, GREEN, CYAN, BLUE, PURPLE, WHITE)
-color = BLACK
+rgb = WHITE
+color = "FFFFFF"
 
-led.value(0) # turn off the red LED initially
-#pwr.value(1) # turn on power to the neopixel
-
-brightness = 0.1
+brightness = 1.0
 pixels_fill(BLACK, brightness)
 
+# WLAN setup
 rp2.country('GB')
-
 wlan = network.WLAN(network.STA_IF) # create a network object
 wlan.active(True) # enable the network
 
@@ -104,11 +91,11 @@ else: # failed to connect
     led.off()  
     raise RuntimeError("network connection failed, status = " + str(wlan_status))
 
+# Set up HTTP listen socket
 addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
-
 s = socket.socket()
 s.bind(addr)
-s.listen(1)
+s.listen(True)
 
 print('listening on', addr)
 led_value = 0
@@ -117,39 +104,57 @@ led_value = 0
 while True:
     try:
         cl, addr = s.accept()
-        print('client connected from', addr)
-        request = cl.recv(1024)
-        print(request)
+#        print('client connected from', addr)
+        buffer = cl.recv(1024)
+#        print(buffer)
 
-        request = request.decode("utf-8")
-        led_on = request.find('/light/on')
-        led_off = request.find('/light/off')
-        query_status = request.find('/light/status')
-        query_brightness = request.find('/light/bright')
-        query_color = request.find('/light/color')
-        response = "\r\n"
+        request = buffer.decode("utf-8")
+        req_list = request.split()
+        assert(len(req_list) >= 2)
+        cmd = req_list.pop(0)
+        
+        if cmd == "GET": # http GET request
+            path_list = req_list.pop(0).split('/')
+#            print("path_list =", path_list)
+            path_list.pop(0) # discard empty first element
+            path_head = path_list.pop(0)
+            response = "\r\n"
+            
+            if (path_head == "light"):
+                attr = path_list.pop(0)
+                
+                if attr == 'on':
+                    print("led on")
+                    led_value = brightness
+                    pixels_fill(rgb, led_value)
+                    np.write()              # write data to all pixels
 
-        if led_on == 6:
-            print("led on")
-            led_value = 1
-            pixels_fill(WHITE, 100)
-            np.write()              # write data to all pixels
+                if attr == 'off':
+                    print("led off")
+                    led_value = 0.0
+                    pixels_fill(rgb, led_value)
+                    np.write()              # write data to all pixels
+                    
+                if attr == 'set':
+                    color = path_list[0]
+                    rgb = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+                    print("Set colour to:", color, "RGB =", rgb)
+                    pixels_fill(rgb, led_value)
+                    np.write()              # write data to all pixels
 
-        if led_off == 6:
-            print("led off")
-            led_value = 0
-            pixels_fill(color, 0)
-            np.write()              # write data to all pixels
+                if attr == 'bright':
+                    print("Query brightness:", brightness*100)
+                    response = str(brightness*100) + "\r\n"
 
-        if query_brightness == 6:
-            print("Query brightness")
-            response = "100\r\n"
+                if attr == 'color':
+                    print("Query color:", color)
+                    response = str(color) + "\r\n"
+                    
+                if attr == 'status':
+                    print("Query status:", led_value)
+                    response = str(led_value) + '\r\n'
 
-        if query_status == 6:
-            print("status =", led_value)
-            response = str(led_value) + '\r\n'
-
-        print ("response =", response)
+#        print ("response =", response)
         cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
         cl.send(response)
         cl.close()
@@ -157,12 +162,4 @@ while True:
     except OSError as e:
         cl.close()
         print('connection closed')
-        
-while True:
-    for color in COLORS:
-        #pixels_fill(color, brightness)
-        pixels_shift_append(color, brightness)
-        np.write()              # write data to all pixels
-        time.sleep(0.5)
-        led.toggle() # blink the red LED
-        
+     
