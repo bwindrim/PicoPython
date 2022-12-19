@@ -3,8 +3,8 @@ from neopixel import NeoPixel
 import time
 
 # Configure the number of WS2812 LEDs, pins and brightness.
-NUM_NEOPIXELS = 3 # ItsyBitsy RP2040 only has one neopixel
-#PWR_PIN = 16      # GPIO16 is neopixel power on ItsyBitsy RP2040
+NUM_NEOPIXELS = 1 # ItsyBitsy RP2040 only has one neopixel
+#PWR_PIN = 1      # GPIO16 is neopixel power on ItsyBitsy RP2040
 NEOPIXEL_PIN = 16 # GPIO17 is the neopixel control on ItsyBitsy RP2040, 16 on Pico breadboard
 LED_PIN = 25      # GPIO11 is the red LED on ItsyBitsy RP2040, GPIO25 for Pico
 
@@ -44,7 +44,7 @@ COLORS = (BLACK, RED, YELLOW, GREEN, CYAN, BLUE, PURPLE, WHITE)
 led.value(0) # turn off the red LED initially
 #pwr.value(1) # turn on power to the neopixel
 
-brightness = 0.1
+brightness = 0.5
 pixels_fill(BLACK, brightness)
 
 while True:
