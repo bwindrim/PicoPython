@@ -68,7 +68,7 @@ def shader_rgb1(time, x, y):
 def shader_hsl1(time, x, y):
     # hue ranges from 0 to 1 over the course of a minute, then wraps
     hue = (time + x) % 60.0 / 60.0
-    return hsl_to_rgb(hue, 1.0, 0.1)
+    return hsl_to_rgb(hue, 1.0, 0.5)
 
 def shader_hsl2(time, x, y):
     # saturation ranges from 0 to 1 over the course of a minute, then wraps
@@ -103,7 +103,7 @@ while True:
     delta = time.ticks_diff(loop_start, start)/1000.0 # compute time difference in seconds
     #print("delta_secs =", delta_secs)
     loop_prev = loop_start
-    render(shader_hsl3, gamma, delta, 15, 4)
+    render(shader_hsl1, gamma, delta, 60, 1)
     np.write()
     render_time = time.ticks_diff(time.ticks_ms(), loop_start)
     if render_time > render_max:
