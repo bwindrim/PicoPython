@@ -1,7 +1,7 @@
 ### main.py
 import time
 #import picosleep
-from machine import Pin, RTC, ADC, lightsleep
+from machine import Pin, RTC, ADC, WDT, lightsleep
 from i2c_responder import I2CResponder
 from struct import pack, unpack
 
@@ -15,20 +15,39 @@ sda = Pin(26,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
 scl = Pin(27,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
 i2c_responder = I2CResponder(1, sda_gpio=26, scl_gpio=27, responder_address=0x41)
 
+wdt = WDT(timeout=3000) # set a 2 second watchdog timeout
+
 status = 0x42
+watch_seconds = 40
+wake_seconds = 20
 do_prt = False
 
-def sleep(interval_s):
+def pi_power_off():
+    "Disable +5V power to the Pi by turning off the wide-input shim"
+    pwr.off()
+    led.off()
+    # turn the pull-ups off to conserve power
+#     sda.init(Pin.IN, None)
+#     scl.init(Pin.IN, None)
+    return
+
+def pi_power_on():
+    "Enable +5V power to the Pi by turning on the wide-input shim"
+    pwr.on()
+    led.on()
+    # turn the pull-ups back on
+#     sda.init(Pin.IN, Pin.PULL_UP)
+#     scl.init(Pin.IN, Pin.PULL_UP)
+    return
+
+def suspend(interval_s):
     ""
     reason = 0 #wake_reason()
     if do_prt:
         print("Sleeping for", interval_s, "s...")
-    # turn the pull-ups off to conserve power
-#     sda.init(Pin.IN, None)
-#     scl.init(Pin.IN, None)
-    led.off()
 #    time.sleep(1) # allow messages to get out before we stop the clocks
     while interval_s > 0:
+        wdt.feed() # the watchdog timer appears to keep running during lightsleep()
         if do_prt:
             time.sleep(1)
         else:
@@ -39,13 +58,20 @@ def sleep(interval_s):
         led.off()
         interval_s -= 1
 #    time.sleep(4)
-    led.on()
-    # turn the pull-ups back on
-#     sda.init(Pin.IN, Pin.PULL_UP)
-#     scl.init(Pin.IN, Pin.PULL_UP)
     if do_prt:
         print("...wakeup, reason =", reason)
     return reason
+
+reset_cause = machine.reset_cause()
+
+if reset_cause is machine.PWRON_RESET:
+    print("Power-on reset")
+    status |= 0x10
+else:
+    assert(reset_cause is machine.WDT_RESET)
+    print("Watchdog reset")
+    status |= 0x20
+    
 
 try:
     print("Polling I2C")
@@ -53,9 +79,10 @@ try:
     # All times are in milliseconds(?)
     ticks_base = time.ticks_ms()
     ticks_timeout = 40000
-    sleep_interval = 20
-    sleep(1)
+#    sleep_interval = 20
+#    suspend(1)
     while True:
+        wdt.feed()
         # Poll for I2C writes
         if i2c_responder.write_data_is_available():
             buffer_in = i2c_responder.get_write_bytes(max_size=16)
@@ -89,6 +116,18 @@ try:
                 status = 0
                 if do_prt:
                     print("Status read and cleared")
+            elif prefix_reg == 5: # watch time register (1 byte)
+                data = watch_seconds.to_bytes(1, 'little')
+                assert(len(data) == 1)
+                status = 0
+                if do_prt:
+                    print("WATCH")
+            elif prefix_reg == 6: # status register read and clear
+                data = wake_seconds.to_bytes(2, 'little')
+                assert(len(data) == 2)
+                status = 0
+                if do_prt:
+                    print("WAKE")
             else: # return a zero byte for all unrecognised regs
                 data = b'\x00'
                 assert(len(data) == 1)
@@ -103,11 +142,13 @@ try:
         # Check for watchdog timeout
         ticks_now = time.ticks_ms()
         ticks_interval = time.ticks_diff(ticks_now, ticks_base)
-        if ticks_timeout != 0 and ticks_interval >= ticks_timeout: # timeout set and reached
-            # This is where we would cut the power to the Pi
+        if watch_seconds != 0 and ticks_interval >= watch_seconds*1000: # timeout set and reached
             if do_prt:
-                print("Watchdog timeout exceeded: timeout =", ticks_timeout, "interval =", ticks_interval);
-            sleep(sleep_interval)
+                print("Watchdog timeout exceeded: timeout =", watch_seconds*1000, "interval =", ticks_interval);
+            pi_power_off() # cut the power to the Pi
+            suspend(wake_seconds)
+            status |= 0x1 # set the status flag for timed wakeup
+            pi_power_on() # restore power to the Pi
             ticks_base = time.ticks_ms()
             
 except KeyboardInterrupt:

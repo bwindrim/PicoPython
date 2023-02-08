@@ -11,8 +11,8 @@ pwr = Pin(22, Pin.OUT, value=1) # wide-input enable, high for power on
 led = Pin(25, Pin.OUT, value=1)
 
 # When using ADC pins for I2C we need to turn on the pull-ups
-Pin(26,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
-Pin(27,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
+sda = Pin(26,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
+scl = Pin(27,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
 i2c_responder = I2CResponder(1, sda_gpio=26, scl_gpio=27, responder_address=0x41)
 
 status = 0x42
@@ -23,17 +23,25 @@ def sleep(interval_s):
     reason = 0 #wake_reason()
     if do_prt:
         print("Sleeping for", interval_s, "s...")
+    # turn the pull-ups off to conserve power
+#     sda.init(Pin.IN, None)
+#     scl.init(Pin.IN, None)
+    led.off()
     time.sleep(1) # allow messages to get out before we stop the clocks
     while interval_s > 0:
-        led.off()
         if do_prt:
             time.sleep(1)
         else:
             picosleep.seconds(2)
         led.on()
-        time.sleep_ms(10)
+        time.sleep_ms(2)
+        led.off()
         interval_s -= 1
     time.sleep(4)
+    led.on()
+    # turn the pull-ups back on
+#     sda.init(Pin.IN, Pin.PULL_UP)
+#     scl.init(Pin.IN, Pin.PULL_UP)
     if do_prt:
         print("...wakeup, reason =", reason)
     return reason
