@@ -1,5 +1,6 @@
 ### i2s_test3.py
 import time
+import gc # garbage collector
 from machine import Pin, RTC, ADC, WDT, lightsleep
 from i2c_responder import I2CResponder
 from struct import pack, unpack
@@ -72,6 +73,7 @@ else:
     status |= 0x10
 
 try:
+    gc.disable() # we call garbage collection explicitly, below
     print("Polling I2C")
     prefix_reg = 0
     # All times are in milliseconds(?)
@@ -150,6 +152,9 @@ try:
             status |= suspend(wake_seconds) # set the status from the wakeup reason
             pi_power_on() # restore power to the Pi
             ticks_base = time.ticks_ms()
-            
+        # At the tail of the loop we give the garbage collector its own watchdog slice to run in
+        wdt.feed()
+        gc.collect()
+
 except KeyboardInterrupt:
     pass
