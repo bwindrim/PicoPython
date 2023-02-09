@@ -1,6 +1,5 @@
-### main.py
+### i2s_test3.py
 import time
-#import picosleep
 from machine import Pin, RTC, ADC, WDT, lightsleep
 from i2c_responder import I2CResponder
 from struct import pack, unpack
@@ -9,6 +8,7 @@ adc = ADC(Pin(28)) # main battery voltage measurement
 rtc = RTC()
 pwr = Pin(22, Pin.OUT, value=1) # wide-input enable, high for power on
 led = Pin(25, Pin.OUT, value=1)
+btn = Pin(12, Pin.IN, Pin.PULL_UP) # push-button input
 
 # When using ADC pins for I2C we need to turn on the pull-ups
 sda = Pin(26,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
@@ -42,22 +42,23 @@ def pi_power_on():
 
 def suspend(interval_s):
     ""
-    reason = 0 #wake_reason()
+    reason = 0x1 #wake_reason()
     if do_prt:
         print("Sleeping for", interval_s, "s...")
 #    time.sleep(1) # allow messages to get out before we stop the clocks
-    while interval_s > 0:
+    while interval_s > 0 and btn.value() is 1:
         wdt.feed() # the watchdog timer appears to keep running during lightsleep()
         if do_prt:
             time.sleep(1)
         else:
-            #picosleep.seconds(2)
-            lightsleep(1000)
+            lightsleep(998)
         led.on()
         time.sleep_ms(2)
         led.off()
         interval_s -= 1
 #    time.sleep(4)
+    if interval_s > 0:
+        reason = 0x2 # button-press wakeup
     if do_prt:
         print("...wakeup, reason =", reason)
     return reason
@@ -146,8 +147,7 @@ try:
             if do_prt:
                 print("Watchdog timeout exceeded: timeout =", watch_seconds*1000, "interval =", ticks_interval);
             pi_power_off() # cut the power to the Pi
-            suspend(wake_seconds)
-            status |= 0x1 # set the status flag for timed wakeup
+            status |= suspend(wake_seconds) # set the status from the wakeup reason
             pi_power_on() # restore power to the Pi
             ticks_base = time.ticks_ms()
             
