@@ -4,23 +4,21 @@ from machine import Pin, RTC, ADC, WDT, lightsleep
 from i2c_responder import I2CResponder
 from struct import pack, unpack
 
+btn = Pin(12, Pin.IN, Pin.PULL_UP)  # push-button input
+pwr = Pin(22, Pin.OUT, value=1)     # wide-input shim enable, high for power on
+led = Pin(25, Pin.OUT, value=1)     # Pico LED control
+sda = Pin(26,  Pin.IN, Pin.PULL_UP) # when using ADC pins for I2C...
+scl = Pin(27,  Pin.IN, Pin.PULL_UP) # ...we need to turn on the pull-ups
 adc = ADC(Pin(28)) # main battery voltage measurement
 rtc = RTC()
-pwr = Pin(22, Pin.OUT, value=1) # wide-input enable, high for power on
-led = Pin(25, Pin.OUT, value=1)
-btn = Pin(12, Pin.IN, Pin.PULL_UP) # push-button input
+i2c = I2CResponder(1, sda_gpio=26, scl_gpio=27, responder_address=0x41)
+wdt = WDT(timeout=8388) # set ~8 sec (max) watchdog timeout
 
-# When using ADC pins for I2C we need to turn on the pull-ups
-sda = Pin(26,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
-scl = Pin(27,  Pin.IN, Pin.PULL_UP) # enable internal pull-up resistor
-i2c_responder = I2CResponder(1, sda_gpio=26, scl_gpio=27, responder_address=0x41)
-
-wdt = WDT(timeout=3000) # set a 2 second watchdog timeout
-
-status = 0x42
-watch_seconds = 40
-wake_seconds = 20
+status = 0x0
+watch_seconds = 30 # should be 4 minutes, in case Pi is hung when Pico restarts
+wake_seconds  = 30 # should be 15 minutes, so Pi doesn't stay off
 do_prt = False
+btn_down = False
 
 def pi_power_off():
     "Disable +5V power to the Pi by turning off the wide-input shim"
@@ -41,62 +39,66 @@ def pi_power_on():
     return
 
 def suspend(interval_s):
-    ""
-    reason = 0x1 #wake_reason()
+    "Sleep for the specified number of seconds, or until button pressed"
+    reason = 0x1
     if do_prt:
         print("Sleeping for", interval_s, "s...")
-#    time.sleep(1) # allow messages to get out before we stop the clocks
     while interval_s > 0 and btn.value() is 1:
         wdt.feed() # the watchdog timer appears to keep running during lightsleep()
+        delay = min(interval_s*1000, 5000) # sleep for <= 5 seconds at a time
         if do_prt:
-            time.sleep(1)
+            time.sleep_ms(delay - 1)
         else:
-            lightsleep(998)
+            lightsleep(delay - 1)
+        # blink the LED
         led.on()
-        time.sleep_ms(2)
+        time.sleep_ms(1)
         led.off()
-        interval_s -= 1
-#    time.sleep(4)
-    if interval_s > 0:
-        reason = 0x2 # button-press wakeup
+        interval_s -= 5
+    if interval_s > 0: # it was the button press that exited the loop
+        btn_down = True
+        reason = 0x3 # button-press wakeup
     if do_prt:
         print("...wakeup, reason =", reason)
     return reason
 
-reset_cause = machine.reset_cause()
-
-if reset_cause is machine.PWRON_RESET:
-    print("Power-on reset")
-    status |= 0x10
-else:
-    assert(reset_cause is machine.WDT_RESET)
+# Check whether we were rebooted by the watchdog
+if machine.reset_cause() is machine.WDT_RESET:
     print("Watchdog reset")
     status |= 0x20
-    
+else:
+    assert(machine.reset_cause() is machine.PWRON_RESET)
+    print("Power-on reset")
+    status |= 0x10
 
 try:
     print("Polling I2C")
     prefix_reg = 0
     # All times are in milliseconds(?)
     ticks_base = time.ticks_ms()
-    ticks_timeout = 40000
-#    sleep_interval = 20
-#    suspend(1)
-    while True:
+
+    while True: # main loop
         wdt.feed()
         # Poll for I2C writes
-        if i2c_responder.write_data_is_available():
-            buffer_in = i2c_responder.get_write_bytes(max_size=16)
+        if i2c.write_data_is_available():
+            buffer_in = i2c.get_write_bytes(max_size=16)
             if len(buffer_in) >= 1:         # received some data
                 prefix_reg = buffer_in[0]   # first byte must be a register number
                 data = buffer_in[1:]        # copy the tail of the buffer
-                if data: # buffer tail wasn't empty
-                    if do_prt:
-                        print("Received I2C WRITE: reg =", prefix_reg, "data =", data, "len =", len(data))
+                if data and do_prt:
+                    print("Received I2C WRITE: reg =", prefix_reg, "data =", data, "len =", len(data))
+                if prefix_reg is 5 and len(data) is 1: # watch time register (1 byte)
+                    watch_seconds = int.from_bytes(data, 'little', False)
+                    ticks_base = time.ticks_ms() # reset watch time base
+                elif prefix_reg is 6 and len(data) is 2: # wake time register (2 bytes)
+                    wake_seconds = int.from_bytes(data, 'little', False)
+                elif prefix_reg is 3 and len(data) is 10: # RTC date/time
+                    rtc.datetime(unpack("HBBBBBBH", data))
+
         # Poll for I2C reads                
-        if i2c_responder.read_is_pending():
-            if prefix_reg == 1: # status register + watchdog reset
-                ticks_base = time.ticks_ms() # reset watchdog time base
+        if i2c.read_is_pending():
+            if prefix_reg == 1: # status register + watch reset
+                ticks_base = time.ticks_ms() # reset watch time base
                 data = status.to_bytes(1, 'little')
                 assert(len(data) == 1)
                 if do_prt:
@@ -120,13 +122,11 @@ try:
             elif prefix_reg == 5: # watch time register (1 byte)
                 data = watch_seconds.to_bytes(1, 'little')
                 assert(len(data) == 1)
-                status = 0
                 if do_prt:
                     print("WATCH")
-            elif prefix_reg == 6: # status register read and clear
+            elif prefix_reg == 6: # wake time register (2 bytes)
                 data = wake_seconds.to_bytes(2, 'little')
                 assert(len(data) == 2)
-                status = 0
                 if do_prt:
                     print("WAKE")
             else: # return a zero byte for all unrecognised regs
@@ -134,18 +134,18 @@ try:
                 assert(len(data) == 1)
                 if do_prt:
                     print("Default")
-            i2c_responder.put_read_bytes(data)
+            i2c.put_read_bytes(data)
             if do_prt:
                 print("Sent I2C READ data for register", prefix_reg)
             prefix_reg = 0
             if do_prt:
                 print()
-        # Check for watchdog timeout
+        # Check for watch timeout (NOT watchdog)
         ticks_now = time.ticks_ms()
         ticks_interval = time.ticks_diff(ticks_now, ticks_base)
         if watch_seconds != 0 and ticks_interval >= watch_seconds*1000: # timeout set and reached
             if do_prt:
-                print("Watchdog timeout exceeded: timeout =", watch_seconds*1000, "interval =", ticks_interval);
+                print("Watch timeout exceeded: timeout =", watch_seconds*1000, "interval =", ticks_interval);
             pi_power_off() # cut the power to the Pi
             status |= suspend(wake_seconds) # set the status from the wakeup reason
             pi_power_on() # restore power to the Pi
