@@ -17,7 +17,6 @@ scl = Pin(27, Pin.IN, Pin.PULL_UP) # ...we need to turn on the pull-ups
 adc = ADC(Pin(28)) # main battery voltage measurement
 rtc = RTC()
 i2c = I2CResponder(1, sda_gpio=26, scl_gpio=27, responder_address=0x41)
-wdt = WDT(timeout=8388) # set ~8 sec (max) watchdog timeout
 
 do_prt = True
 btn_down = False
@@ -67,12 +66,14 @@ def suspend(interval_s):
 # Check whether we were rebooted by the watchdog (WDT)
 status = machine.reset_cause() # initialise status
 if status is machine.WDT_RESET:
-    print("Watchdog reset")
+    print("Watchdog reset - sleeping for 10 seconds")
+    time.sleep(10) # give time for REPL to break in before watchdog restarts
 else:
     assert(status is machine.PWRON_RESET)
     print("Power-on reset")
 watch_seconds = 30 # should be 4 minutes, in case Pi is hung when Pico restarts
 wake_seconds  = 30 # should be 15 minutes, so Pi doesn't stay off
+wdt = WDT(timeout=8388) # set ~8 sec (max) watchdog timeout
 
 try:
     gc.disable() # we call garbage collection explicitly, below
