@@ -16,10 +16,15 @@ def pixel(arr, x, y):
     hi=arr[n+1]
     return lo + (hi << 8), x, y
 
-def update(i2c, buff, fb):
+def update(i2c, buff, fb, width=8):
     "Copy a MicroPython framebuffer bytearray to an I2C buffer, and write it to the device"
-    for i, (p,x,y) in enumerate(pixel(fb, x, y) for y in range(8) for x in range(8)):
-        # extract the RGB components froma 16-bit pixel
+    for i, (x,y) in enumerate((x, y) for y in range(8) for x in range(8)):
+        # extract a 16-bit pixel (x,y) from the specified framebuffer bytearray
+        n = 2*(x + width*y) # calculate the pixel address
+        lo = fb[n]          # get the first (lo) byte
+        hi=fb[n+1]          # get the second (hi) byte
+        p = lo + (hi << 8)  # combine the bytes into a 16-bit pixel
+        # extract the RGB components from the 16-bit pixel
         red = p >> 11
         green = 0x2f & (p >> 5)
         blue = p & 0x1f
@@ -31,5 +36,6 @@ def update(i2c, buff, fb):
     i2c.writeto_mem(0x46, 0, buf)
 
 fbuf.fill(0x2f << 11)
-fbuf.text('Y',0, 0, 0xffff)
+fbuf.text('m',0, 0, 0xffff)
 update(i2c, buf, fb)
+
