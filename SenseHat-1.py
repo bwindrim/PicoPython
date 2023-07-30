@@ -40,19 +40,15 @@ def update(i2c, buff, fb, x_offset=0, y_offset=0, width=8):
     # send the bytearray to the I2C LED grid
     i2c.writeto_mem(0x46, 0, buf)
 
-#print (i2c.scan())
-
-#string = "Hello World!"
 string = "Hello World!"
-w = 8*(len(string) + 1)
-r = len(string) - 1
+w = 8*(len(string) + 2)
 
 fbuf, fb = create_framebuffer(width=w, height=16)
 
 fbuf.fill(0x2f << 11)
-fbuf.text(string,0, 0, 0xffff)
+fbuf.text(string, 8, 0, 0xffff)
 
-for offset in range(8*len(string)):
+for offset in range(8*(1 + len(string))):
     update(i2c, buf, fb, x_offset=offset, y_offset=0, width=w)
     time.sleep(0.1)
 
