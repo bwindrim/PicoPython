@@ -23,12 +23,9 @@ def create_framebuffer(width=8, height=8):
 
 def update(i2c, buff, fb, x_offset=0, y_offset=0, width=8):
     "Copy a MicroPython framebuffer bytearray to an I2C buffer, and write it to the device"
-    xx = 0 # 1, 0, -1, 0
-    yy = 0 # 1, 0, -1, 0
-    yx = -24 # 0, 24, 0, -24
-    xy = 1 # 0, -1, 0, 1 
-    xo = 0 # 0, 7, 7, 0
-    yo = 7*24 # 0, 0, 7*24, 7*24
+    xf = 1 # 1, 24, -1, -24
+    yf = 24 # 24, -1, -24, 1
+    of = 0 # 0, 7, 7*25, 7*24
     for i, (x,y) in enumerate((x, y) for y in range(8) for x in range(8)):
         # extract a 16-bit pixel (x,y) from the specified framebuffer bytearray
         n = 2*(x + x_offset + width*(y + y_offset)) # calculate the pixel address
@@ -40,7 +37,7 @@ def update(i2c, buff, fb, x_offset=0, y_offset=0, width=8):
         green = 0x2f & (p >> 5)
         blue = p & 0x1f
         # and write them (as 6-bit values) to an I2C bytearray
-        pos = xo + xx*x + xy*y + yo + yy*y + yx*x
+        pos = of + xf*x + yf*y
         buf[pos]      = red << 1
         buf[pos + 8]  = green
         buf[pos + 16] = blue << 1
