@@ -42,9 +42,10 @@ fbuf, fb = create_framebuffer(width=w, height=16)
 fbuf.fill(0x2f << 11)
 fbuf.text(string, 8, 0, 0xffff)
 
-for offset in range(8*(1 + len(string))):
-    update(i2c, fb, x_offset=offset, y_offset=0, width=w)
-    time.sleep(0.1)
+for dir in range(4):
+    for offset in range(8*(1 + len(string))):
+        update(i2c, fb, x_offset=offset, y_offset=0, width=w, dir=dir)
+        time.sleep(0.025)
 
     
 
