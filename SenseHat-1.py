@@ -4,14 +4,6 @@ import time
 
 # ItsyBitsy RP2040 wires its SDA and SCL to GPIO2 and GPIO3 respectively, which are connected to I2C1
 i2c = I2C(1, scl=Pin(3), sda=Pin(2), freq=400000)
-buf = bytearray(192) # space for 8x8 LED array, 3 bytes per LED
-
-# def pixel(arr, x, y):
-#     "Extract a pixel x,y from the specified framebuffer bytearray and return it, with its co-ordinates"
-#     n = 2*(x + 8*y)
-#     lo = arr[n]
-#     hi=arr[n+1]
-#     return lo + (hi << 8), x, y
 
 def create_framebuffer(width=8, height=8):
     "Allocate a bytearray of the required size and then create a MicroPython framebuffer"
@@ -26,8 +18,9 @@ xf = [1, 24, -1, -24]
 yf = [24, -1, -24, 1]
 of = [0, 7, 7*25, 7*24]
 
-def update(i2c, buff, fb, x_offset=0, y_offset=0, width=8, dir=0):
+def update(i2c, fb, x_offset=0, y_offset=0, width=8, dir=0):
     "Copy a MicroPython framebuffer bytearray to an I2C buffer, and write it to the device"
+    buf = bytearray(192) # space for 8x8 LED array, 3 bytes per LED
     for y in range(8):
         for x in range(8):
             # Extract a 16-bit pixel (x,y) from the specified framebuffer bytearray
@@ -50,7 +43,7 @@ fbuf.fill(0x2f << 11)
 fbuf.text(string, 8, 0, 0xffff)
 
 for offset in range(8*(1 + len(string))):
-    update(i2c, buf, fb, x_offset=offset, y_offset=0, width=w)
+    update(i2c, fb, x_offset=offset, y_offset=0, width=w)
     time.sleep(0.1)
 
     
