@@ -137,11 +137,11 @@ def rgb16(rgb):
 
     return (red&0x1F) << 11 | (green&0x3F) << 5 | (blue&0x1F)
     
-def set_pixels(hat, np):
+def set_pixels(fbuf, np):
     i = 0
     for y in range(8):
         for x in range(8):
-            hat.fbuf.pixel(x, y, rgb16(np[i]))
+            fbuf.pixel(x, y, rgb16(np[i]))
             i += 1
         
 hat = SenseHat()
@@ -156,7 +156,7 @@ while True:
     #print("delta =", delta)
     loop_prev = loop_start
     render(shader_hsl1, gamma, delta, 8, 8)
-    set_pixels(hat, np)
+    set_pixels(hat.fbuf, np)
     hat.update()
     render_time = time.time()*1000.0 - loop_start
     if render_time > render_max:

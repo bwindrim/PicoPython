@@ -10,7 +10,7 @@ from struct import pack, unpack
 micropython.opt_level(0) # zero is default, i.e. assertions are enabled
 
 btn = Pin(12, Pin.IN, Pin.PULL_UP) # push-button input
-pwr = Pin(22, Pin.OUT, value=1)    # wide-input shim enable, high for power on
+pwr = Pin(22, Pin.OPEN_DRAIN, value=1)    # wide-input shim enable, pull low for power off
 led = Pin(25, Pin.OUT, value=1)    # Pico LED control
 sda = Pin(26, Pin.IN, Pin.PULL_UP) # when using ADC pins for I2C...
 scl = Pin(27, Pin.IN, Pin.PULL_UP) # ...we need to turn on the pull-ups
@@ -87,8 +87,11 @@ try:
 
         # Poll for I2C writes
         if i2c.write_data_is_available(): # process register write
-            buffer_in = i2c.get_write_bytes(max_size=16)
-            if len(buffer_in) >= 1:         # received some data
+            buffer_in = i2c.get_write_bytes(max_size=16) # ToDo: what if we're faster than the bus?
+            assert(len(buffer_in) > 0)
+            if len(buffer_in) is 1: # just a register selection, a read should follow
+                prefix_reg = buffer_in[0]   # buffer only contains a register number
+            else:  # there is data after the reg number
                 prefix_reg = buffer_in[0]   # first byte must be a register number
                 data = buffer_in[1:]        # copy the tail of the buffer
                 if data and do_prt >= 2:
@@ -96,15 +99,19 @@ try:
                 if prefix_reg is 5 and len(data) is 1: # watch time register (1 byte)
                     watch_seconds = int.from_bytes(data, 'little', False)
                     ticks_base = time.ticks_ms() # reset watch time base
+                    prefix_reg = 0
                     if do_prt >= 1:
                         print("WATCH set to", watch_seconds)
                 elif prefix_reg is 6 and len(data) is 2: # wake time register (2 bytes)
-                    wake_seconds = int.from_bytes(data, 'little', False)
+                    wake_seconds = int.from_bytes(data, 'little', False) << 2 # value is in 2-sec units
+                    prefix_reg = 0
                     if do_prt >= 1:
                         print("WAKE set to", wake_seconds)
                 elif prefix_reg is 3 and len(data) is 10: # RTC date/time
                     rtc.datetime(unpack("HBBBBBBH", data))
+                    prefix_reg = 0
                 elif do_prt >= 1 and len(data) > 0:
+                    prefix_reg = 0
                     print("Unhandled reg write, reg =", prefix_reg, "buffer_in =", buffer_in)
 
         # Poll for I2C reads                
@@ -138,7 +145,7 @@ try:
                 if do_prt >= 2:
                     print("WATCH:", watch_seconds)
             elif prefix_reg == 6: # wake time register (2 bytes)
-                data = wake_seconds.to_bytes(2, 'little')
+                data = (wake_seconds >> 2).to_bytes(2, 'little')
                 assert(len(data) == 2)
                 if do_prt >= 2:
                     print("WAKE:", wake_seconds)

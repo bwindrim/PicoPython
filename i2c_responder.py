@@ -41,6 +41,8 @@ class I2CResponder:
     IC_CLR_TX_ABRT = 0x54
     IC_ENABLE = 0x6C
     IC_STATUS = 0x70
+    IC_TX_FLR = 0x74
+    IC_RX_FLR = 0x78
 
     # GPIO Register block size (i.e.) per GPIO
     GPIO_REGISTER_BLOCK_SIZE = 8
@@ -174,6 +176,8 @@ class I2CResponder:
             True if data is available, False otherwise.
         """
         # get IC_STATUS
+        return mem32[self.i2c_base | self.IC_RX_FLR] & 0x1F
+    
         status = mem32[self.i2c_base | self.IC_STATUS]
         # Check RFNE (Receive FIFO not empty)
         if status & self.IC_STATUS__RFNE:

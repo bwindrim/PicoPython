@@ -1,5 +1,5 @@
 from machine import Pin, Timer
-led = Pin(25, Pin.OUT)
+led = Pin(11, Pin.OUT) # 25 for Pico (non-W), 11 for ItsyBitsy
 timer = Timer()
 
 def blink(timer):
