@@ -42,7 +42,7 @@ class SenseHat:
         self.i2c.writeto_mem(0x46, 0, buf)
 
     def read_stick(self):
-        "Read state of Sense Hat joystick"
+        "Read state of Sense Hat joystick, causes LEDs to flicker"
         b = self.i2c.readfrom_mem(0x46,0xf2,1) # read joystick
         
         return int.from_bytes(b, 'little')
@@ -57,7 +57,7 @@ hat.fbuf.fill(0x2f << 11)
 hat.fbuf.text(string, 8, 0, 0xffff)
 
 while True:
-    joy = hat.read_stick()
+    joy = hat.read_stick() # note: this causes the LEDs to flicker
     if joy:
         if joy & 0x1:
             dir = 1
