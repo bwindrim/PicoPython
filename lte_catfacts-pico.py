@@ -1,0 +1,38 @@
+"""
+Get yourself a cat fact over 4G!
+"""
+
+import lte
+import time
+import requests
+from machine import Pin, PWM, UART
+
+MOBILE_APN = "iot.1nce.net"
+
+# Fix the eye-searing brightness of the onboard LED with PWM
+class Netlight:
+    def __init__(self):
+        self.pin = PWM(Pin("LED", Pin.OUT), freq=1000)
+
+    def value(self, value):
+        self.pin.duty_u16(value * 2000)
+
+
+con = lte.LTE(MOBILE_APN, uart=UART(0), reset_pin=Pin(7, Pin.OUT), netlight_pin=Pin(6, Pin.IN), netlight_led=Netlight())
+#con = lte.LTE(MOBILE_APN)
+con.start_ppp()
+
+try:
+    t_start = time.time()
+    request = requests.get('http://catfact.ninja/fact').json()
+    fact = request['fact']
+    print(f'Cat fact: {fact}')
+
+finally:
+    t_end = time.time()
+
+    print(f"Took: {t_end - t_start} seconds")
+
+    print("Disconnecting...")
+    con.stop_ppp()
+    print("Done!")
