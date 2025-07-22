@@ -98,7 +98,9 @@ def callback(topic, msg, retained, qos):
         except ValueError:
             print("Error decoding hex message")
             return
-    await mqtt_rx_queue.put((topic, msg, retained, qos))
+    # Append the message to the MQTT RX queue
+    # Message callbacks are non-async, so we use put_nowait to avoid blocking.
+    mqtt_rx_queue.put_nowait((topic, msg, retained, qos))
 
 async def conn_callback(client):
     print("MQTT connected, subscribing to", SUBSCRIBE_TOPIC)
@@ -127,6 +129,8 @@ async def main(client):
     await client.connect()
     print("MQTT connected!")
     await asyncio.sleep(0) # Yield control to allow conn_callback to complete its subscribe
+#    while True:
+#        await asyncio.sleep(0)
     n = 0
     while True:
         print('publish', n)
