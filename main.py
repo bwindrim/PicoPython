@@ -12,6 +12,8 @@ from machine import Pin, UART
 from machine import UART
 import uasyncio as asyncio
 
+import sys_constants
+
 hex_encode = True
 
 uart = UART(1, baudrate=57600)
@@ -88,8 +90,6 @@ async def uart_rx_loop():
                     rxbuf.append(b)
         await asyncio.sleep_ms(2)
 
-MOBILE_APN = "iot.1nce.net"
-
 mqtt_rx_queue = uaqueue.Queue()
 uart_rx_queue = uaqueue.Queue()
 
@@ -115,9 +115,9 @@ async def conn_callback(client):
     This function will be called when the client connects to the MQTT broker.
     """
     netlight.override = False  # Allow the netlight to be controlled by the MQTT client
-    print("MQTT connected, subscribing to", SUBSCRIBE_TOPIC)
+    print("MQTT connected, subscribing to", sys_constants.SUBSCRIBE_TOPIC)
     # Subscribe to the topic with QoS level 1
-    await client.subscribe(SUBSCRIBE_TOPIC, 1)
+    await client.subscribe(sys_constants.SUBSCRIBE_TOPIC, 1)
 
 async def mqtt_rx_queue_reader():
     while True:
@@ -137,7 +137,7 @@ async def uart_rx_queue_reader():
         if hex_encode:
             # Encode the message to hex if hex_encode is True
             msg = msg.hex().encode('utf-8')
-        await client.publish(PUBLISH_TOPIC, msg, qos=1)
+        await client.publish(sys_constants.PUBLISH_TOPIC, msg, qos=1)
 
 async def main():
     asyncio.create_task(uart_rx_loop())
@@ -158,9 +158,7 @@ async def main():
 # The topic can be changed to whatever you want to publish/subscribe to.
 # The QoS level can also be adjusted as needed (0, 1, or 2).
 # The default QoS is 1, which means the message will be delivered at least once
-SUBSCRIBE_TOPIC = 'BWtest/mqtt_async/1/in'
-PUBLISH_TOPIC   = 'BWtest/mqtt_async/1/out'
-config.server   = 'broker.hivemq.com' # can be an IP address or a hostname
+config.server   = sys_constants.BROKER_ADDR # can be an IP address or a hostname
 config.subs_cb = callback
 config.connect_coro = conn_callback
 
@@ -168,7 +166,7 @@ netlight = Netlight("LED")  # Use the built-in LED pin for netlight indication
 netlight.state = 1  # Turn on the netlight to indicate the script is running
 
 # Initialize the LTE connection
-con = lte.LTE(MOBILE_APN, uart=UART(0, tx=Pin(16, Pin.OUT), rx=Pin(17, Pin.IN)), reset_pin=Pin(18, Pin.OUT), netlight_pin=Pin(19, Pin.IN), netlight_led=netlight)
+con = lte.LTE(sys_constants.MOBILE_APN, uart=UART(0, tx=Pin(16, Pin.OUT), rx=Pin(17, Pin.IN)), reset_pin=Pin(18, Pin.OUT), netlight_pin=Pin(19, Pin.IN), netlight_led=netlight)
 con.start_ppp(baudrate=115200) # stay at the Clipper module's default baudrate
 
 try:
