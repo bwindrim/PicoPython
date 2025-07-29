@@ -8,7 +8,6 @@ from mqtt_async import MQTTClient, config
 import asyncio
 import uaqueue
 from machine import Pin, UART
-#import uartcobs
 
 from machine import UART
 import uasyncio as asyncio
@@ -16,6 +15,21 @@ import uasyncio as asyncio
 hex_encode = True
 
 uart = UART(1, baudrate=57600)
+
+class Netlight:
+    def __init__(self, pin):
+        self.pin = Pin(pin, Pin.OUT)
+        self.override = True  # True to override the pin state
+        self.state = 0  # 0 for low, 1 for high
+        self.pin.value(0)  # Start with the pin low
+
+    def value(self, value):
+        """Set the pin value, overriding if necessary."""
+        if self.override:
+            self.pin.value(self.state)
+        else:
+            # If not overriding, set the pin to the given value
+            self.pin.value(value)
 
 # -------- COBS Encoding / Decoding --------
 
@@ -97,6 +111,10 @@ def callback(topic, msg, retained, qos):
     mqtt_rx_queue.put_nowait((topic, msg, retained, qos))
 
 async def conn_callback(client):
+    """Callback function to handle MQTT connection events.
+    This function will be called when the client connects to the MQTT broker.
+    """
+    netlight.override = False  # Allow the netlight to be controlled by the MQTT client
     print("MQTT connected, subscribing to", SUBSCRIBE_TOPIC)
     # Subscribe to the topic with QoS level 1
     await client.subscribe(SUBSCRIBE_TOPIC, 1)
@@ -106,8 +124,11 @@ async def mqtt_rx_queue_reader():
         topic, msg, retained, qos = await mqtt_rx_queue.get()
         print("Received from MQTT RX queue:", topic, msg, retained, qos)
         frame = cobs_encode(msg)  # encode the message as COBS
-        uart.write(frame)   # forward the encoded message to the UART
-        await asyncio.sleep_ms(1)  # Yield to event loop
+        # Send the encoded message over UART in chunks of 8 bytes, so as
+        # not to over-fill the UART Tx FIFO and hence block async execution.
+        for i in range(0, len(frame), 8):
+            uart.write(frame[i:i+8])
+            await asyncio.sleep(0)  # cooperative yield
 
 async def uart_rx_queue_reader():
     while True:
@@ -118,13 +139,12 @@ async def uart_rx_queue_reader():
             msg = msg.hex().encode('utf-8')
         await client.publish(PUBLISH_TOPIC, msg, qos=1)
 
-async def main(client):
+async def main():
     asyncio.create_task(uart_rx_loop())
     asyncio.create_task(mqtt_rx_queue_reader())
     asyncio.create_task(uart_rx_queue_reader())
     await client.connect()
     print("MQTT connected!")
-#    await asyncio.sleep(0) # Yield control to allow conn_callback to complete its subscribe
     while True:
         await asyncio.sleep(1)
         print("Waiting for messages...")
@@ -144,19 +164,26 @@ config.server   = 'broker.hivemq.com' # can be an IP address or a hostname
 config.subs_cb = callback
 config.connect_coro = conn_callback
 
+netlight = Netlight("LED")  # Use the built-in LED pin for netlight indication
+netlight.state = 1  # Turn on the netlight to indicate the script is running
+
 # Initialize the LTE connection
-con = lte.LTE(MOBILE_APN, uart=UART(0, tx=Pin(16, Pin.OUT), rx=Pin(17, Pin.IN)), reset_pin=Pin(18, Pin.OUT), netlight_pin=Pin(19, Pin.IN), netlight_led=Pin("LED", Pin.OUT))
+con = lte.LTE(MOBILE_APN, uart=UART(0, tx=Pin(16, Pin.OUT), rx=Pin(17, Pin.IN)), reset_pin=Pin(18, Pin.OUT), netlight_pin=Pin(19, Pin.IN), netlight_led=netlight)
 con.start_ppp(baudrate=115200) # stay at the Clipper module's default baudrate
 
 try:
     t_start = time.time()
     client = MQTTClient(config)
-    asyncio.run(main(client))
+    asyncio.run(main())
 except KeyboardInterrupt:
     print("KeyboardInterrupt: stopping...")
 finally:
     t_end = time.time()
     print(f"Took: {t_end - t_start} seconds")
     print("Disconnecting...")
+    client.disconnect()
     con.stop_ppp()
+    netlight.override = True  # Allow the netlight to be controlled
+    netlight.state = 0  # Turn off the netlight
+    netlight.value(0)
     print("Done!")
