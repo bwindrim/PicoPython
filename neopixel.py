@@ -14,27 +14,27 @@ npx = Pin(NEOPIXEL_PIN, Pin.OUT)
  
 # RP2040 PIO state machine program for outputting to neopixels.
 # Each iteration of the PIO loop outputs one bit to the neopixel chain and
-# takes 10 state machine cycles, whether outputting a 1 or a 0.
+# takes 8 state machine cycles, whether outputting a 1 or a 0.
 # So at a state machine clock frequency of 8MHz (see below) this gives
-# the 800KHz bitrate that neopixels require.
+# the 1MHz bitrate that (some) neopixels seem to tolerate.
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
 def ws2812():
     "RP2040 PIO state machine program for outputting to neopixels"
-    T1 = 2
-    T2 = 4
-    T3 = 2
+    T1 = 2 # number of cycles for which to hold high for any bit
+    T2 = 2 # number of cycles for which to output bit value
+    T3 = 4 # number of cycles for which to hold low for any bit
     wrap_target()
     label("bitloop")
-    out(x, 1)               .side(0)    [T3 - 1] # low for 2 cycles (250ns)
+    out(x, 1)               .side(0)    [T3 - 1] # low for 4 cycles (500ns)
     jmp(not_x, "do_zero")   .side(1)    [T1 - 1] # high for 2 cycles (250ns)
-    jmp("bitloop")          .side(1)    [T2 - 1] # high for 4 cycles (500ns) = '1'
+    jmp("bitloop")          .side(1)    [T2 - 1] # high for 2 cycles (250ns) = '1'
     label("do_zero")
-    nop()                   .side(0)    [T2 - 1] # low for 4 cycles (500ns) = '0'
+    nop()                   .side(0)    [T2 - 1] # low for 2 cycles (250ns) = '0'
     wrap()
  
  
  
-# Create the StateMachine with the ws2812 program, running at a clock frequency of ~cd get8MHz,
+# Create the StateMachine with the ws2812 program, running at a clock frequency of 8MHz,
 # and outputting on the neopixel pin.
 sm0 = rp2.StateMachine(0, ws2812, freq=8_000_000, sideset_base=npx)
  
