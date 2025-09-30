@@ -21,15 +21,15 @@ npx = Pin(NEOPIXEL_PIN, Pin.OUT)
 def ws2812():
     "RP2040 PIO state machine program for outputting to neopixels"
     T1 = 2
-    T2 = 5
-    T3 = 3
+    T2 = 4
+    T3 = 2
     wrap_target()
     label("bitloop")
-    out(x, 1)               .side(0)    [T3 - 1] # low for 3 cycles
-    jmp(not_x, "do_zero")   .side(1)    [T1 - 1] # high for 2 cycles
-    jmp("bitloop")          .side(1)    [T2 - 1] # high for 5 cycles = '1'
+    out(x, 1)               .side(0)    [T3 - 1] # low for 2 cycles (250ns)
+    jmp(not_x, "do_zero")   .side(1)    [T1 - 1] # high for 2 cycles (250ns)
+    jmp("bitloop")          .side(1)    [T2 - 1] # high for 4 cycles (500ns) = '1'
     label("do_zero")
-    nop()                   .side(0)    [T2 - 1] # low for 5 cycles = '0'
+    nop()                   .side(0)    [T2 - 1] # low for 4 cycles (500ns) = '0'
     wrap()
  
  
