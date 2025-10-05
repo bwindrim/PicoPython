@@ -81,6 +81,13 @@ def shader_hsl3(time, x, y):
     hue = (time*20 + x) % 15.0 / 15.0
     return hsl_to_rgb(hue, 1.0, (y + 1) / 8)
 
+def shader_hsl4(time, x, y):
+    time = time * 20.0 # speed up time factor
+    time = sin(radians(time))*30.0 + 30.0 # oscillate time between 0 and 60
+    # hue oscillates from 0 to 1 and back over the course of 12 seconds
+    hue = (time + x) % 60.0 / 60.0 # 0.0 to 1.0
+    return hsl_to_rgb(hue, 1.0, 0.5)
+
 def grayscale1(time, x, y): # grey ramp
     return ((x / 59.0), (x / 59.0), (x / 59.0))
 
@@ -106,7 +113,7 @@ try:
         delta = time.ticks_diff(loop_start, start)/1000.0 # compute time difference in seconds
         #print("delta_secs =", delta_secs)
         loop_prev = loop_start
-        render(shader_hsl1, gamma, delta, 60, 1)
+        render(shader_hsl4, gamma, delta, 60, 1)
         np.write()
         render_time = time.ticks_diff(time.ticks_ms(), loop_start)
         render_count += 1
