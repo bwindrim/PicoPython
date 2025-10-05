@@ -98,17 +98,28 @@ pwr.value(0) # enable the NeoPixel output
 start = time.ticks_ms() # get millisecond counter
 loop_prev = start
 render_max = 0
-while True:
-    loop_start = time.ticks_ms()
-    delta = time.ticks_diff(loop_start, start)/1000.0 # compute time difference in seconds
-    #print("delta_secs =", delta_secs)
-    loop_prev = loop_start
-    render(shader_hsl1, gamma, delta, 60, 1)
+render_total = 0
+render_count = 0
+try:
+    while True:
+        loop_start = time.ticks_ms()
+        delta = time.ticks_diff(loop_start, start)/1000.0 # compute time difference in seconds
+        #print("delta_secs =", delta_secs)
+        loop_prev = loop_start
+        render(shader_hsl1, gamma, delta, 60, 1)
+        np.write()
+        render_time = time.ticks_diff(time.ticks_ms(), loop_start)
+        render_count += 1
+        render_total += render_time
+        if render_time > render_max:
+            render_max = render_time
+            print("render time =", render_time, "ms")
+    #    assert(render_time < 65)
+    # time.sleep_ms(100 - render_time)
+except KeyboardInterrupt:
+    print("max render time =", render_max, "ms")
+    print("average render time =", render_total / render_count, "ms")
+    np.fill((0, 0, 0))
     np.write()
-    render_time = time.ticks_diff(time.ticks_ms(), loop_start)
-    if render_time > render_max:
-        render_max = render_time
-        print("render time =", render_time, "ms")
-#    assert(render_time < 65)
-   # time.sleep_ms(100 - render_time)
-
+    pwr.value(1) # disable the NeoPixel output
+    print("done")
