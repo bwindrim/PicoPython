@@ -3,10 +3,10 @@ from machine import Pin
 import rp2
  
 # Configure the number of WS2812 LEDs, pins and brightness.
-NUM_NEOPIXELS = 1 # ItsyBitsy RP2040 only has one neopixel
+NUM_NEOPIXELS = 4 # ItsyBitsy RP2040 only has one neopixel
 #PWR_PIN = 16      # GPIO16 is neopixel power on ItsyBitsy RP2040
-NEOPIXEL_PIN = 2 # GPIO17 is the neopixel control on ItsyBitsy RP2040, 2 on Pico breadboard
-LED_PIN = 25      # GPIO11 is the red LED on ItsyBitsy RP2040, GPIO25 for Pico
+NEOPIXEL_PIN = 20 # GPIO17 is the neopixel control on ItsyBitsy RP2040, 20 on Pico 2 breadboard
+LED_PIN = "LED"      # GPIO11 is the red LED on ItsyBitsy RP2040, GPIO25 for Pico, "LED" is generic name for on-board LED on many boards
 
 #pwr = Pin(PWR_PIN, Pin.OUT)
 led = Pin(LED_PIN, Pin.OUT)
@@ -84,10 +84,16 @@ led.value(0) # turn off the red LED initially
 brightness = 0.1
 pixels_fill(BLACK, brightness)
 
-while True:
-    for color in COLORS:
-        #pixels_fill(color, brightness)
-        pixels_shift_append(color, brightness)
-        pixels_show(ar)
-        time.sleep(0.5)
-        led.toggle() # blink the LED
+try:
+    while True:
+        for color in COLORS:
+            #pixels_fill(color, brightness)
+            pixels_shift_append(color, brightness)
+            pixels_show(ar)
+            time.sleep(0.5)
+            led.toggle() # blink the LED
+except KeyboardInterrupt:
+    pixels_fill(BLACK, brightness)
+    pixels_show(ar)
+    led.value(1) # show we're still powered
+    print("Done")
