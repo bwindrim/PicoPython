@@ -17,19 +17,19 @@ npx = Pin(NEOPIXEL_PIN, Pin.OUT)
 # takes 8 state machine cycles, whether outputting a 1 or a 0.
 # So at a state machine clock frequency of 8MHz (see below) this gives
 # the 1MHz bitrate that (some) neopixels seem to tolerate.
-@rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
+@rp2.asm_pio(sideset_init=(rp2.PIO.OUT_LOW, rp2.PIO.OUT_LOW, rp2.PIO.OUT_LOW), out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
 def ws2812():
-    "RP2040 PIO state machine program for outputting to neopixels"
+    "RP2040 PIO state machine program for outputting to neopixels, 3 sideset pins"
     T1 = 2 # number of cycles for which to hold high for any bit
     T2 = 2 # number of cycles for which to output bit value
     T3 = 4 # number of cycles for which to hold low for any bit
     wrap_target()
     label("bitloop")
-    out(x, 1)               .side(0)    [T3 - 1] # low for 4 cycles (500ns)
-    jmp(not_x, "do_zero")   .side(1)    [T1 - 1] # high for 2 cycles (250ns)
-    jmp("bitloop")          .side(1)    [T2 - 1] # high for 2 cycles (250ns) = '1'
+    out(x, 1)               .side(0b000)    [T3 - 1] # all low for 4 cycles
+    jmp(not_x, "do_zero")   .side(0b111)    [T1 - 1] # all high for 2 cycles
+    jmp("bitloop")          .side(0b111)    [T2 - 1] # all high for 2 cycles = '1'
     label("do_zero")
-    nop()                   .side(0)    [T2 - 1] # low for 2 cycles (250ns) = '0'
+    nop()                   .side(0b000)    [T2 - 1] # all low for 2 cycles = '0'
     wrap()
  
  
@@ -42,7 +42,6 @@ sm0 = rp2.StateMachine(0, ws2812, freq=8_000_000, sideset_base=npx)
 sm0.active(True)
  
 # Display a pattern on the LEDs via an array of LED RGB values.
-#ar = array.array("I", [0 for _ in range(NUM_NEOPIXELS)])
 ar = array.array("I", [0 for _ in range(NUM_NEOPIXELS)])
 
 def pixels_show(ar):
@@ -78,7 +77,7 @@ PURPLE = (180, 0, 255)
 WHITE = (255, 255, 255)
 COLORS = (BLACK, RED, YELLOW, GREEN, CYAN, BLUE, PURPLE, WHITE)
 
-led.value(0) # turn off the red LED initially
+led.value(0) # turn off the board's own LED initially
 #pwr.value(1) # turn on power to the neopixel
 
 brightness = 0.1
