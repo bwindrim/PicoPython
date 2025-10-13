@@ -30,18 +30,19 @@ def ramp(duty_start, duty_end, step, forward=True, delay=0.01):
         time.sleep(delay)
     move_motor(forward, duty_end)
 
+max_duty = 10000  # Max duty cycle for 16-bit PWM
 try:
     while True:
         # Ramp up forward
-        ramp(0, 40000, 1000, forward=True)
+        ramp(0, max_duty, 1000, forward=True)
         time.sleep(2)
         # Ramp down forward
-        ramp(40000, 0, 1000, forward=True)
+        ramp(max_duty, 0, 1000, forward=True)
         # Ramp up reverse
-        ramp(0, 40000, 1000, forward=False)
+        ramp(0, max_duty, 1000, forward=False)
         time.sleep(2)
         # Ramp down reverse
-        ramp(40000, 0, 1000, forward=False)
+        ramp(max_duty, 0, 1000, forward=False)
 except KeyboardInterrupt:
     pin1.duty_u16(0)
     pin2.duty_u16(0)

@@ -52,7 +52,39 @@ def read_accel_gyro():
     gz = read_word(GYRO_XOUT_H + 4)
     return (ax, ay, az, gx, gy, gz)
 
+def calibrate(samples=100):
+    print("Calibrating MPU6050... Please keep the device still.")
+    sum_ax = sum_ay = sum_az = sum_gx = sum_gy = sum_gz = 0
+    for _ in range(samples):
+        ax, ay, az, gx, gy, gz = read_accel_gyro()
+        sum_ax += ax
+        sum_ay += ay
+        sum_az += az
+        sum_gx += gx
+        sum_gy += gy
+        sum_gz += gz
+        time.sleep(0.01)
+    offset_ax = sum_ax // samples
+    offset_ay = sum_ay // samples
+    offset_az = (sum_az // samples) - 16384  # 1g offset for Z
+    offset_gx = sum_gx // samples
+    offset_gy = sum_gy // samples
+    offset_gz = sum_gz // samples
+    print("Calibration complete.")
+    print("Accel offsets: ax={} ay={} az={}".format(offset_ax, offset_ay, offset_az))
+    print("Gyro offsets:  gx={} gy={} gz={}".format(offset_gx, offset_gy, offset_gz))
+    return offset_ax, offset_ay, offset_az, offset_gx, offset_gy, offset_gz
+
+# Calibrate before main loop
+ax_off, ay_off, az_off, gx_off, gy_off, gz_off = calibrate()
+
 while True:
     ax, ay, az, gx, gy, gz = read_accel_gyro()
+    ax -= ax_off
+    ay -= ay_off
+    az -= az_off
+    gx -= gx_off
+    gy -= gy_off
+    gz -= gz_off
     print('Accel: x={:6d} y={:6d} z={:6d} | Gyro: x={:6d} y={:6d} z={:6d}'.format(ax, ay, az, gx, gy, gz))
     time.sleep(0.5)
