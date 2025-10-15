@@ -4,8 +4,8 @@ import machine
 import time
 
 # H-bridge inputs
-pin1 = machine.PWM(machine.Pin(12))
-pin2 = machine.PWM(machine.Pin(13))
+pin1 = machine.PWM(machine.Pin(14))
+pin2 = machine.PWM(machine.Pin(15))
 
 # Set PWM frequency (Hz)
 FREQ = 1000
@@ -30,7 +30,7 @@ def ramp(duty_start, duty_end, step, forward=True, delay=0.01):
         time.sleep(delay)
     move_motor(forward, duty_end)
 
-max_duty = 10000  # Max duty cycle for 16-bit PWM
+max_duty = 20000  # Max duty cycle for 16-bit PWM
 try:
     while True:
         # Ramp up forward
@@ -46,4 +46,4 @@ try:
 except KeyboardInterrupt:
     pin1.duty_u16(0)
     pin2.duty_u16(0)
-    print("Done.")
+    print("Done, motor off.")

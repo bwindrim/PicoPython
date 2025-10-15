@@ -8,7 +8,7 @@ from time import sleep
 from machine import Pin, I2C
 
 
-i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
+i2c = I2C(0, sda=Pin(4), scl=Pin(5), freq=400000)
 imu = MPU6050(i2c)
 
 

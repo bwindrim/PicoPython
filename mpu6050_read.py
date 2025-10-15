@@ -12,7 +12,7 @@ GYRO_XOUT_H  = 0x43
 
 # Init I2C0
 # Use correct GPIOs for Pico I2C0: SDA=Pin 0, SCL=Pin 1
-i2c = machine.I2C(0, scl=machine.Pin(1), sda=machine.Pin(0), freq=400_000)
+i2c = machine.I2C(0, scl=machine.Pin(5), sda=machine.Pin(4), freq=400_000)
 
 # Wait for MPU6050 to be ready
 time.sleep(0.1)
