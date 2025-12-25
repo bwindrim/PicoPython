@@ -104,9 +104,16 @@ np = NeoPixel(pin, NUM_NEOPIXELS)   # create NeoPixel driver
 
 pwr.value(0) # enable the NeoPixel output
 
+async def pixel(shader, n, x, y):
+    while True:
+        time_now = time.ticks_ms()
+        delta = time.ticks_diff(time_now, start) / 1000.0
+        color = shader(delta, x, y)
+        np[n] = gamma(color)
+        await asyncio.sleep_ms(50)
+
 # replace blocking loop with asyncio task
 async def _led_loop(shader):
-    start = time.ticks_ms()
     render_max = 0
     render_total = 0
     render_count = 0
@@ -114,7 +121,7 @@ async def _led_loop(shader):
         while True:
             loop_start = time.ticks_ms()
             delta = time.ticks_diff(loop_start, start) / 1000.0
-            render(shader, gamma, delta, NUM_NEOPIXELS, 1)
+#            render(shader, gamma, delta, NUM_NEOPIXELS, 1)
             np.write()
             render_time = time.ticks_diff(time.ticks_ms(), loop_start)
             render_count += 1
@@ -141,6 +148,10 @@ async def _led_loop(shader):
 
 async def main():
     task = asyncio.create_task(_led_loop(shader_hsl4))
+
+    for x in range(NUM_NEOPIXELS):
+        asyncio.create_task(pixel(shader_hsl4, x, x, 0))
+
     try:
         await task
     except asyncio.CancelledError:
@@ -148,6 +159,7 @@ async def main():
         pass
 
 try:
+    start = time.ticks_ms()
     asyncio.run(main())
 except KeyboardInterrupt:
     # best-effort cleanup if interrupted before task finishes
