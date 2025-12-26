@@ -4,10 +4,9 @@ import socket
 import machine
 import rp2
 import ubinascii
-import asyncio
 from neopixel import NeoPixel
 from math import sin, radians, fabs, pow, ceil
-import urandom
+import random
 
 BLACK   = (0.0, 0.0, 0.0)
 WHITE   = (1.0, 1.0, 1.0)
@@ -113,71 +112,59 @@ np = NeoPixel(pin, NUM_NEOPIXELS)   # create NeoPixel driver
 
 pwr.value(0) # enable the NeoPixel output
 
+class Executor:
+    def __init__(self, tasks):
+        self.tasks = tasks
+
+    def run_once(self):
+        for t in self.tasks:
+            try:
+                next(t)
+            except StopIteration:
+                pass
+
 async def pixel(shader, n, x, y, offset):
     while True:
         time_now = time.ticks_ms()
         delta = time.ticks_diff(time_now, start) / 1000.0
         color = shader(delta, x, y, offset)
         np[n] = gamma(color)
-        await asyncio.sleep_ms(50)
+        yield
 
 # replace blocking loop with asyncio task
-async def _led_loop(shader):
+async def _led_loop():
     render_max = 10
     render_total = 0
     render_count = 0
     render_last = time.ticks_ms()
-    try:
-        while True:
-#            delta = time.ticks_diff(render_last, start) / 1000.0
-#            render(shader, gamma, delta, NUM_NEOPIXELS, 1)
-            np.write()
-            render_time = time.ticks_diff(time.ticks_ms(), render_last)
-            render_count += 1
-            render_total += render_time
-            if render_time > render_max:
-                render_max = render_time
-                print("render time =", render_time, "ms, frame =", render_count)
-            # target ~50 ms frame interval (adjust as needed)
-            render_last = time.ticks_ms()
-            wait = 50 - render_time
-            if wait > 0:
-                await asyncio.sleep_ms(wait)
-            else:
-                await asyncio.sleep_ms(1)
-    except asyncio.CancelledError:
-        pass
-    finally:
-        print("max render time =", render_max, "ms")
-        if render_count:
-            print("average render time =", render_total / render_count, "ms")
-        np.fill((0, 0, 0))
+    while True:
         np.write()
-        pwr.value(1) # disable the NeoPixel output
-        print("done")
-
-async def main():
-    task = asyncio.create_task(_led_loop(shader_hsl4))
-
-    for x in range(NUM_NEOPIXELS):
-        offset = urandom.uniform(0, 1)
-        asyncio.create_task(pixel(shader_hsl5, x, x, 0, offset))
-
-    try:
-        await task
-    except asyncio.CancelledError:
-        # ensure cleanup handled in _led_loop finally
-        pass
+        render_time = time.ticks_diff(time.ticks_ms(), render_last)
+        render_count += 1
+        render_total += render_time
+        if render_time > render_max:
+            render_max = render_time
+            print("render time =", render_time, "ms, frame =", render_count)
+        # target ~50 ms frame interval (adjust as needed)
+        render_last = time.ticks_ms()
+        yield
 
 try:
     start = time.ticks_ms()
-    asyncio.run(main())
+    tasks = [pixel(shader_hsl5, x, x, 0, random.uniform(0, 1)) for x in range(NUM_NEOPIXELS)]
+    tasks.append(_led_loop())
+
+    exec = Executor(tasks)
+
+    while True:
+        exec.run_once()
+        time.sleep_ms(10)
 except KeyboardInterrupt:
     # best-effort cleanup if interrupted before task finishes
-    try:
-        np.fill((0, 0, 0))
-        np.write()
-    except Exception:
-        pass
-    pwr.value(1)
-    print("Interrupted and cleaned up")
+    print("max render time =", render_max, "ms")
+    if render_count:
+        print("average render time =", render_total / render_count, "ms")
+    np.fill((0, 0, 0))
+    np.write()
+    pwr.value(1) # disable the NeoPixel output
+    print("done")
