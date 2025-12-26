@@ -107,18 +107,16 @@ class Executor:
     def run_once(self):
         for i, t in enumerate(self.tasks):
             try:
-                np[i] = next(t)
+                np[i] = gamma(next(t))
             except StopIteration:
                 pass
 
 def shader_hsl5(n, x, y, offset):
     while True:
-        val = sin(radians(delta))*30.0 + 30.0 # oscillate time between 0 and 60
         # hue oscillates from 0 to 1 and back over the course of 12 seconds
-        hue = (val + x) % 60.0 / 60.0 # 0.0 to 1.0
+        hue = (sin1 + x) % 60.0 / 60.0 # 0.0 to 1.0
         #lum = (time + x + offset) % 60.0 / 60.0 # 0.0 to 1.0
-        color = hsl_to_rgb(hue, 1.0, offset/4)
-        yield gamma(color)
+        yield hsl_to_rgb(hue, 1.0, offset/4)
 
 try:
     render_max = 10
@@ -132,6 +130,7 @@ try:
 
     while True:
         delta = time.ticks_diff(time.ticks_ms(), start) / 50.0 # speed up time factor
+        sin1 = sin(radians(delta))*30.0 + 30.0 # oscillate time between 0 and 60
         exec.run_once()
         np.write()
         render_time = time.ticks_diff(time.ticks_ms(), render_last)
