@@ -93,7 +93,8 @@ def shader_hsl4(x, y):
         hue = (sin1 + x) % 60.0 / 60.0 # 0.0 to 1.0
         yield hsl_to_rgb(hue, 1.0, 0.25)
 
-def shader_hsl5(x, y, offset):
+def shader_hsl5(x, y):
+    offset = random.uniform(0, 1)
     while True:
         # hue oscillates from 0 to 1 and back over the course of 12 seconds
         hue = (sin1 + x) % 60.0 / 60.0 # 0.0 to 1.0
@@ -128,7 +129,7 @@ try:
     render_last = time.ticks_ms()
     start = time.ticks_ms()
 #    tasks = [shader_hsl4(x, 0) for x in range(NUM_NEOPIXELS)]
-    tasks = [shader_hsl5(x, 0, random.uniform(0, 1)) for x in range(NUM_NEOPIXELS)]
+    tasks = [shader_hsl5(x, 0) for x in range(NUM_NEOPIXELS)]
 
     exec = Executor(tasks)
 
