@@ -7,6 +7,7 @@ import ubinascii
 from neopixel import NeoPixel
 from math import sin, radians, fabs, pow, ceil
 import random
+import gc
 
 BLACK   = (0.0, 0.0, 0.0)
 WHITE   = (1.0, 1.0, 1.0)
@@ -104,28 +105,34 @@ class Executor:
         self.tasks = tasks
 
     def run_once(self):
-        for t in self.tasks:
+        for i, t in enumerate(self.tasks):
             try:
-                next(t)
+                np[i] = next(t)
             except StopIteration:
                 pass
 
 def shader_hsl5(n, x, y, offset):
     while True:
-        now = time.ticks_ms()
-        delta = time.ticks_diff(now, start) / 50.0 # speed up time factor
         val = sin(radians(delta))*30.0 + 30.0 # oscillate time between 0 and 60
         # hue oscillates from 0 to 1 and back over the course of 12 seconds
         hue = (val + x) % 60.0 / 60.0 # 0.0 to 1.0
         #lum = (time + x + offset) % 60.0 / 60.0 # 0.0 to 1.0
         color = hsl_to_rgb(hue, 1.0, offset/4)
-        np[n] = gamma(color)
-        yield
+        yield gamma(color)
 
-# replace blocking loop with asyncio task
-def _led_loop():
-    global render_max, render_total, render_count, render_last
+try:
+    render_max = 10
+    render_total = 0
+    render_count = 0
+    render_last = time.ticks_ms()
+    start = time.ticks_ms()
+    tasks = [shader_hsl5(x, x, 0, random.uniform(0, 1)) for x in range(NUM_NEOPIXELS)]
+
+    exec = Executor(tasks)
+
     while True:
+        delta = time.ticks_diff(time.ticks_ms(), start) / 50.0 # speed up time factor
+        exec.run_once()
         np.write()
         render_time = time.ticks_diff(time.ticks_ms(), render_last)
         render_count += 1
@@ -135,22 +142,7 @@ def _led_loop():
             print("render time =", render_time, "ms, frame =", render_count)
         # target ~50 ms frame interval (adjust as needed)
         render_last = time.ticks_ms()
-        yield
-
-try:
-    render_max = 10
-    render_total = 0
-    render_count = 0
-    render_last = time.ticks_ms()
-    start = time.ticks_ms()
-    tasks = [shader_hsl5(x, x, 0, random.uniform(0, 1)) for x in range(NUM_NEOPIXELS)]
-    tasks.append(_led_loop())
-
-    exec = Executor(tasks)
-
-    while True:
-        exec.run_once()
-        time.sleep_ms(10)
+        gc.collect()
 except KeyboardInterrupt:
     # best-effort cleanup if interrupted before task finishes
     print("max render time =", render_max, "ms")
