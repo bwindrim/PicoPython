@@ -89,22 +89,9 @@ def shader_hsl4(time, x, y):
     hue = (time + x) % 60.0 / 60.0 # 0.0 to 1.0
     return hsl_to_rgb(hue, 1.0, 0.25)
 
-def shader_hsl5(time, x, y, offset):
-    time = time * 20.0 # speed up time factor
-    time = sin(radians(time))*30.0 + 30.0 # oscillate time between 0 and 60
-    # hue oscillates from 0 to 1 and back over the course of 12 seconds
-    hue = (time + x) % 60.0 / 60.0 # 0.0 to 1.0
-    #lum = (time + x + offset) % 60.0 / 60.0 # 0.0 to 1.0
-    return hsl_to_rgb(hue, 1.0, offset/4)
-
 def grayscale1(time, x, y): # grey ramp
     return ((x / 59.0), (x / 59.0), (x / 59.0))
 
-def render(shader, gamma, time, width, height=1):
-#    print("time =", time)
-    for i, c in enumerate(shader(time, x, y) for y in range(height) for x in range(width)):
-        np[i] = gamma(c)
-        
 pwr = machine.Pin(PWR_PIN, machine.Pin.OUT)
 led = machine.Pin(LED_PIN, machine.Pin.OUT)
 pin = machine.Pin(NEOPIXEL_PIN, machine.Pin.OUT)   # set GPIO0 to output to drive NeoPixels
@@ -123,20 +110,21 @@ class Executor:
             except StopIteration:
                 pass
 
-async def pixel(shader, n, x, y, offset):
+def shader_hsl5(n, x, y, offset):
     while True:
-        time_now = time.ticks_ms()
-        delta = time.ticks_diff(time_now, start) / 1000.0
-        color = shader(delta, x, y, offset)
+        now = time.ticks_ms()
+        delta = time.ticks_diff(now, start) / 50.0 # speed up time factor
+        val = sin(radians(delta))*30.0 + 30.0 # oscillate time between 0 and 60
+        # hue oscillates from 0 to 1 and back over the course of 12 seconds
+        hue = (val + x) % 60.0 / 60.0 # 0.0 to 1.0
+        #lum = (time + x + offset) % 60.0 / 60.0 # 0.0 to 1.0
+        color = hsl_to_rgb(hue, 1.0, offset/4)
         np[n] = gamma(color)
         yield
 
 # replace blocking loop with asyncio task
-async def _led_loop():
-    render_max = 10
-    render_total = 0
-    render_count = 0
-    render_last = time.ticks_ms()
+def _led_loop():
+    global render_max, render_total, render_count, render_last
     while True:
         np.write()
         render_time = time.ticks_diff(time.ticks_ms(), render_last)
@@ -150,8 +138,12 @@ async def _led_loop():
         yield
 
 try:
+    render_max = 10
+    render_total = 0
+    render_count = 0
+    render_last = time.ticks_ms()
     start = time.ticks_ms()
-    tasks = [pixel(shader_hsl5, x, x, 0, random.uniform(0, 1)) for x in range(NUM_NEOPIXELS)]
+    tasks = [shader_hsl5(x, x, 0, random.uniform(0, 1)) for x in range(NUM_NEOPIXELS)]
     tasks.append(_led_loop())
 
     exec = Executor(tasks)
