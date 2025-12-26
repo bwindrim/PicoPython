@@ -7,6 +7,7 @@ import ubinascii
 import asyncio
 from neopixel import NeoPixel
 from math import sin, radians, fabs, pow, ceil
+import urandom
 
 BLACK   = (0.0, 0.0, 0.0)
 WHITE   = (1.0, 1.0, 1.0)
@@ -89,6 +90,14 @@ def shader_hsl4(time, x, y):
     hue = (time + x) % 60.0 / 60.0 # 0.0 to 1.0
     return hsl_to_rgb(hue, 1.0, 0.25)
 
+def shader_hsl5(time, x, y, offset):
+    time = time * 20.0 # speed up time factor
+    time = sin(radians(time))*30.0 + 30.0 # oscillate time between 0 and 60
+    # hue oscillates from 0 to 1 and back over the course of 12 seconds
+    hue = (time + x) % 60.0 / 60.0 # 0.0 to 1.0
+    #lum = (time + x + offset) % 60.0 / 60.0 # 0.0 to 1.0
+    return hsl_to_rgb(hue, 1.0, offset/4)
+
 def grayscale1(time, x, y): # grey ramp
     return ((x / 59.0), (x / 59.0), (x / 59.0))
 
@@ -104,32 +113,33 @@ np = NeoPixel(pin, NUM_NEOPIXELS)   # create NeoPixel driver
 
 pwr.value(0) # enable the NeoPixel output
 
-async def pixel(shader, n, x, y):
+async def pixel(shader, n, x, y, offset):
     while True:
         time_now = time.ticks_ms()
         delta = time.ticks_diff(time_now, start) / 1000.0
-        color = shader(delta, x, y)
+        color = shader(delta, x, y, offset)
         np[n] = gamma(color)
         await asyncio.sleep_ms(50)
 
 # replace blocking loop with asyncio task
 async def _led_loop(shader):
-    render_max = 0
+    render_max = 10
     render_total = 0
     render_count = 0
+    render_last = time.ticks_ms()
     try:
         while True:
-            loop_start = time.ticks_ms()
-            delta = time.ticks_diff(loop_start, start) / 1000.0
+#            delta = time.ticks_diff(render_last, start) / 1000.0
 #            render(shader, gamma, delta, NUM_NEOPIXELS, 1)
             np.write()
-            render_time = time.ticks_diff(time.ticks_ms(), loop_start)
+            render_time = time.ticks_diff(time.ticks_ms(), render_last)
             render_count += 1
             render_total += render_time
             if render_time > render_max:
                 render_max = render_time
-                print("render time =", render_time, "ms")
+                print("render time =", render_time, "ms, frame =", render_count)
             # target ~50 ms frame interval (adjust as needed)
+            render_last = time.ticks_ms()
             wait = 50 - render_time
             if wait > 0:
                 await asyncio.sleep_ms(wait)
@@ -150,7 +160,8 @@ async def main():
     task = asyncio.create_task(_led_loop(shader_hsl4))
 
     for x in range(NUM_NEOPIXELS):
-        asyncio.create_task(pixel(shader_hsl4, x, x, 0))
+        offset = urandom.uniform(0, 1)
+        asyncio.create_task(pixel(shader_hsl5, x, x, 0, offset))
 
     try:
         await task
