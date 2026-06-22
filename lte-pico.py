@@ -18,7 +18,7 @@ class Netlight:
         self.pin.duty_u16(value * 2000)
 
 
-con = lte.LTE(MOBILE_APN, uart=UART(0), reset_pin=Pin(7, Pin.OUT), netlight_pin=Pin(6, Pin.IN), netlight_led=Netlight(), skip_reset=RESUME)
+con = lte.LTE(MOBILE_APN, uart=UART(0, tx=Pin(12, Pin.OUT), rx=Pin(13, Pin.IN)), reset_pin=Pin(3, Pin.OUT), netlight_pin=Pin(2, Pin.IN), netlight_led=Netlight(), skip_reset=RESUME)
 con.start_ppp(connect=not RESUME)
 
 # Do some requests! Internet stuff should just work now.

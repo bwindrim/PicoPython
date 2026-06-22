@@ -64,51 +64,51 @@ else: # failed to connect
     led.off()  
     raise RuntimeError("network connection failed, status = " + str(wlan_status))
 
-addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
-
-s = socket.socket()
-s.bind(addr)
-s.listen(1)
-
-print('listening on', addr)
-
+# addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
+# 
+# s = socket.socket()
+# s.bind(addr)
+# s.listen(1)
+# 
+# print('listening on', addr)
+# 
 # Listen for connections
-while True:
-    try:
-        cl, addr = s.accept()
-        print('client connected from', addr)
-        request = cl.recv(1024)
-        print(request)
-
-        request = str(request)
-        led_on = request.find('/light/on')
-        led_off = request.find('/light/off')
-        query_status = request.find('/light/status')
-        print( 'led on = ' + str(led_on))
-        print( 'led off = ' + str(led_off))
-        response = ""
-
-        if led_on == 6:
-            print("led on")
-            led.value(1)
-            stateis = "LED is ON"
-            response = html % stateis
-
-        if led_off == 6:
-            print("led off")
-            led.value(0)
-            stateis = "LED is OFF"
-            response = html % stateis
-
-        if query_status == 6:
-            print("status =", led.value())
-            response = str(led.value()) + '\r\n'
-
-        print ("response =", response)
-        cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
-        cl.send(response)
-        cl.close()
-
-    except OSError as e:
-        cl.close()
-        print('connection closed')
+# while True:
+#     try:
+#         cl, addr = s.accept()
+#         print('client connected from', addr)
+#         request = cl.recv(1024)
+#         print(request)
+# 
+#         request = str(request)
+#         led_on = request.find('/light/on')
+#         led_off = request.find('/light/off')
+#         query_status = request.find('/light/status')
+#         print( 'led on = ' + str(led_on))
+#         print( 'led off = ' + str(led_off))
+#         response = ""
+# 
+#         if led_on == 6:
+#             print("led on")
+#             led.value(1)
+#             stateis = "LED is ON"
+#             response = html % stateis
+# 
+#         if led_off == 6:
+#             print("led off")
+#             led.value(0)
+#             stateis = "LED is OFF"
+#             response = html % stateis
+# 
+#         if query_status == 6:
+#             print("status =", led.value())
+#             response = str(led.value()) + '\r\n'
+# 
+#         print ("response =", response)
+#         cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
+#         cl.send(response)
+#         cl.close()
+# 
+#     except OSError as e:
+#         cl.close()
+#         print('connection closed')
