@@ -5,6 +5,7 @@ from time import sleep
 from dfplayermini import DFPlayerMini
 
 led = Pin('LED', Pin.OUT)
+hand = Pin(26, Pin. IN, Pin.PULL_UP)
 
 
 # Define the GPIO pins for each stepper motor coil.
@@ -159,11 +160,11 @@ if __name__ == "__main__":
 
         while True:
             print("Press the BOOTSEL button to start the demo sequence...")
-            print("...starting demo sequence")
             led.value(1)  # Turn on LED to indicate we're starting the test
-            while not bootsel_button():
+            while not bootsel_button() and hand.value():
                 pass  # Wait for bootsel button press to start
 
+            print("...starting demo sequence")
             result = player1.play(1)
             print(f"Play Result: {result}")
             sleep(5)
