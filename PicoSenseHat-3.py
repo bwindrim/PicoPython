@@ -66,7 +66,7 @@ class L9110():
 
         # convert the rate into a 16-bit fixed point integer
         pwm = min(max(int(2**16 * abs(rate)), 0), 65535)
-        print("pwm =", pwm)
+#        print("pwm =", pwm)
         if rate < 0:
             self.ia.duty_u16(0)
             self.ib.duty_u16(pwm)
@@ -74,9 +74,14 @@ class L9110():
             self.ib.duty_u16(0)
             self.ia.duty_u16(pwm)
 
-def write_motors(motors, duty=0.0):
-    for motor in motors:
-        motor.write(duty)
+def write_motors(motors, x_pad=0, y_pad=0):
+    "Write the joystick values to the motors"
+    x_duty = x_pad/512.0
+    y_duty = -y_pad/512.0
+    dutys = [y_duty, y_duty, y_duty, y_duty]
+    dutys = [x_duty + y_duty, -x_duty + y_duty, -x_duty + y_duty, x_duty + y_duty]
+    for i, motor in enumerate(motors):
+        motor.write(dutys[i])
 
 
 #--------------------------------------------------------------------------------
@@ -99,7 +104,7 @@ hat.fbuf.fill(0x2f << 11)
 hat.fbuf.text(string, 8, 0, 0xffff)
 
 async def main():
-    write_motors(motors, duty=0.0)
+    write_motors(motors, x_pad=0, y_pad=0)
     gamepad.start()
     last = None
     last_identity = None
@@ -118,8 +123,8 @@ async def main():
         pad = gamepad.read() # note: this causes the LEDs to flicker
         joy = pad[1]
 
-        write_motors(motors, duty=pad[4]/512.0)
-        
+        write_motors(motors, x_pad=pad[3], y_pad=pad[4])
+
         if joy:
             if joy & 0x1:
                 dir = 1
