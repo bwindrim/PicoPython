@@ -1,9 +1,8 @@
 from machine import I2C, SoftI2C, Pin
 import framebuf
-import time
+import asyncio
 import sys
 import gamepad
-import time
 
 class SenseHat:
     "Wrapper class for accessing the Sense Hat"
@@ -58,39 +57,41 @@ hat.create_framebuffer(width=w)
 hat.fbuf.fill(0x2f << 11)
 hat.fbuf.text(string, 8, 0, 0xffff)
 
-gamepad.start()
-last = None
-last_identity = None
-while True:
-    gamepad.poll()
-    info = gamepad.info()
-    identity = (info["name"], info["address"], info["vendor_id"],
-                info["product_id"], info["transport"], info["ready"])
-    if identity != last_identity:
-        print("DEVICE", info)
-        last_identity = identity
-    current = (gamepad.status(), gamepad.read())
-    if current != last:
-        print("STATE", current, "reports", info["reports"])
-        last = current
-    pad = gamepad.read() # note: this causes the LEDs to flicker
-    joy = pad[1]
-    if joy:
-        if joy & 0x1:
-            dir = 1
-        elif joy & 0x2:
-            dir = 0
-        elif joy & 0x4:
-            dir = 3
-        elif joy & 0x8:
-            dir = 2
-        elif joy & 0x10:
-            sys.exit()
-        print("joy =", joy, "dir =", dir)
-        for offset in range(8*(1 + len(string))):
-            hat.update(x_offset=offset, width=w, dir=dir)
-            time.sleep(0.025)
+async def main():
+    gamepad.start()
+    last = None
+    last_identity = None
+    while True:
+        gamepad.poll()
+        info = gamepad.info()
+        identity = (info["name"], info["address"], info["vendor_id"],
+                    info["product_id"], info["transport"], info["ready"])
+        if identity != last_identity:
+            print("DEVICE", info)
+            last_identity = identity
+        current = (gamepad.status(), gamepad.read())
+        if current != last:
+            print("STATE", current, "reports", info["reports"])
+            last = current
+        pad = gamepad.read() # note: this causes the LEDs to flicker
+        joy = pad[1]
+        if joy:
+            if joy & 0x1:
+                dir = 1
+            elif joy & 0x2:
+                dir = 0
+            elif joy & 0x4:
+                dir = 3
+            elif joy & 0x8:
+                dir = 2
+            elif joy & 0x10:
+                sys.exit()
+            print("joy =", joy, "dir =", dir)
+            for offset in range(8*(1 + len(string))):
+                hat.update(x_offset=offset, width=w, dir=dir)
+                await asyncio.sleep_ms(25)
 
-    time.sleep_ms(5)
-    
+        await asyncio.sleep_ms(5)
 
+
+asyncio.run(main())
