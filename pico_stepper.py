@@ -39,13 +39,12 @@ def GPIO_output(list, values):
         pins[i].value(j)
     
 # Define GPIO signals to use
-# Physical pins 11,15,16,18
-# GPIO17,GPIO22,GPIO23,GPIO24
-#StepPins = [16,2,17,3] # motor 0
-#StepPins = [4,6,5,7] # motor 1
-#StepPins = [8,10,9,11] # motor 2
-#StepPins = [12,14,13,15] # motor 3
-StepPins = [16,2,17,3] # motor 3
+# StepPins = [16,2,17,3] # motor A/0
+# StepPins = [4,6,5,7] # motor B/1
+# StepPins = [8,10,9,11] # motor C/2
+# StepPins = [12,14,13,15] # motor D/3
+StepPins = [16,17,18,19] # motor B/1
+
 
 # Set all motor pins as outputs
 GPIO_setup(StepPins, Pin.OUT)
@@ -54,14 +53,15 @@ GPIO_output(StepPins, [0, 0, 0, 0])
 
 # Define advanced sequence
 # as shown in manufacturer's datasheet
-Seq = [[1,0,0,1],
-       [1,0,0,0],
+Seq = [[1,0,0,0],
        [1,1,0,0],
        [0,1,0,0],
        [0,1,1,0],
        [0,0,1,0],
        [0,0,1,1],
-       [0,0,0,1]]
+       [0,0,0,1],
+       [1,0,0,1]
+       ]
        
 StepCount = len(Seq)
 StepDir = 1 # Set to 1 or 2 for clockwise
@@ -71,7 +71,7 @@ StepDir = 1 # Set to 1 or 2 for clockwise
 # if len(sys.argv)>1:
 #     WaitTime = int(sys.argv[1])/float(1000)
 # else:
-WaitTime = 20/float(1000)
+WaitTime = 200/float(1000)
 
 # Initialise variables
 StepCounter = 0
@@ -84,7 +84,7 @@ try:
         led.toggle()
 
         GPIO_output(StepPins, Seq[StepCounter])
-
+        print("StepCounter =", StepCounter, "Seq =", Seq[StepCounter])
         # If we reach the end of the sequence
         # start again
         StepCounter = (StepCounter + StepDir) % StepCount

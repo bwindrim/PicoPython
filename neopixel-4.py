@@ -1,6 +1,6 @@
 import time
-import network
-import socket
+#import network
+#import socket
 import machine
 import rp2
 import ubinascii
