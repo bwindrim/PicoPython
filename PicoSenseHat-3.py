@@ -1,4 +1,5 @@
-from machine import I2C, SoftI2C, Pin
+from machine import I2C, SoftI2C, Pin, PWM
+import math, time
 import framebuf
 import asyncio
 import sys
@@ -48,6 +49,46 @@ class SenseHat:
         
         return int.from_bytes(b, 'little')
 
+class L9110():
+    def __init__(self, IA=18, IB=19, pwm_rate=20000):
+        # Create a pair of PWMOut objects for each motor channel.
+        self.ia = PWM(Pin(IA))
+        self.ia.freq(pwm_rate)
+        self.ia.duty_u16(0)
+        self.ib = PWM(Pin(IB))
+        self.ib.freq(pwm_rate)
+        self.ib.duty_u16(0)
+
+    def write(self, rate):
+        """Set the speed and direction on a single motor channel.
+
+        :param rate: modulation value between -1.0 and 1.0, full reverse to full forward."""
+
+        # convert the rate into a 16-bit fixed point integer
+        pwm = min(max(int(2**16 * abs(rate)), 0), 65535)
+        print("pwm =", pwm)
+        if rate < 0:
+            self.ia.duty_u16(0)
+            self.ib.duty_u16(pwm)
+        else:
+            self.ib.duty_u16(0)
+            self.ia.duty_u16(pwm)
+
+def write_motors(motors, duty=0.0):
+    for motor in motors:
+        motor.write(duty)
+
+
+#--------------------------------------------------------------------------------
+# Create an object to represent a motor driver.
+print("Creating driver objects")
+motor0 = L9110(IA=12, IB=13)
+motor1 = L9110(IA=14, IB=15)
+motor2 = L9110(IA=16, IB=17)
+motor3 = L9110(IA=18, IB=19)
+
+motors = [motor0, motor1, motor2, motor3]
+
 string = "Hello World!"
 w = 8*(len(string) + 2)
 
@@ -58,6 +99,7 @@ hat.fbuf.fill(0x2f << 11)
 hat.fbuf.text(string, 8, 0, 0xffff)
 
 async def main():
+    write_motors(motors, duty=0.0)
     gamepad.start()
     last = None
     last_identity = None
@@ -75,6 +117,9 @@ async def main():
             last = current
         pad = gamepad.read() # note: this causes the LEDs to flicker
         joy = pad[1]
+
+        write_motors(motors, duty=pad[4]/512.0)
+        
         if joy:
             if joy & 0x1:
                 dir = 1
