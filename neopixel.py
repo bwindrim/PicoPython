@@ -3,9 +3,9 @@ from machine import Pin
 import rp2
  
 # Configure the number of WS2812 LEDs, pins and brightness.
-NUM_NEOPIXELS = 4 # ItsyBitsy RP2040 only has one neopixel
+NUM_NEOPIXELS = 1 # ItsyBitsy RP2040 only has one neopixel
 #PWR_PIN = 16      # GPIO16 is neopixel power on ItsyBitsy RP2040
-NEOPIXEL_PIN = 20 # GPIO17 is the neopixel control on ItsyBitsy RP2040, 20 on Pico 2 breadboard
+NEOPIXEL_PIN = 16 # GPIO17 is the neopixel control on ItsyBitsy RP2040, 20 on Pico 2 breadboard
 LED_PIN = "LED"      # GPIO11 is the red LED on ItsyBitsy RP2040, GPIO25 for Pico, "LED" is generic name for on-board LED on many boards
 
 #pwr = Pin(PWR_PIN, Pin.OUT)
@@ -20,9 +20,9 @@ npx = Pin(NEOPIXEL_PIN, Pin.OUT)
 @rp2.asm_pio(sideset_init=(rp2.PIO.OUT_LOW, rp2.PIO.OUT_LOW, rp2.PIO.OUT_LOW), out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
 def ws2812():
     "RP2040 PIO state machine program for outputting to neopixels, 3 sideset pins"
-    T1 = 2 # number of cycles for which to hold high for any bit
-    T2 = 2 # number of cycles for which to output bit value
-    T3 = 4 # number of cycles for which to hold low for any bit
+    T1 = 2 # number of cycles for which to hold high for any bit (=250ns at 8MHz)
+    T2 = 2 # number of cycles for which to output bit value      (=250ns at 8MHz)
+    T3 = 4 # number of cycles for which to hold low for any bit  (=500ns at 8MHz)
     wrap_target()
     label("bitloop")
     out(x, 1)               .side(0b000)    [T3 - 1] # all low for 4 cycles
@@ -69,13 +69,13 @@ def pixels_shift_append(color, brightness):
     
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-YELLOW = (255, 150, 0)
+YELLOW = (255, 255, 0)
 GREEN = (0, 255, 0)
 CYAN = (0, 255, 255)
 BLUE = (0, 0, 255)
-PURPLE = (180, 0, 255)
+MAGENTA = (255, 0, 255)
 WHITE = (255, 255, 255)
-COLORS = (BLACK, RED, YELLOW, GREEN, CYAN, BLUE, PURPLE, WHITE)
+COLORS = (RED, GREEN, BLUE, CYAN, MAGENTA, YELLOW, WHITE)
 
 led.value(0) # turn off the board's own LED initially
 #pwr.value(1) # turn on power to the neopixel
@@ -86,11 +86,14 @@ pixels_fill(BLACK, brightness)
 try:
     while True:
         for color in COLORS:
-            #pixels_fill(color, brightness)
-            pixels_shift_append(color, brightness)
-            pixels_show(ar)
-            time.sleep(0.5)
-            led.toggle() # blink the LED
+            for brightness in range(0, 255):
+                #pixels_fill(color, brightness)
+                brightness_scaled = brightness / 255
+                pixels_shift_append(color, brightness_scaled)
+                print(f"Color: {color}, Brightness: {brightness_scaled:.2f}")
+                pixels_show(ar)
+                time.sleep(0.05)
+                led.toggle() # blink the LED
 except KeyboardInterrupt:
     pixels_fill(BLACK, brightness)
     pixels_show(ar)
